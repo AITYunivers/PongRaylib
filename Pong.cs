@@ -224,7 +224,7 @@ namespace PongRaylib
         {
             Vector2 calcPos = BallPosition;
             if (BallVelocity.X == 0 || BallVelocity.Y == 0)
-                return (int)calcPos.Y;
+                return 400;
             while (true)
             {
                 if (calcPos.Y - _ballRadius <= 0 || calcPos.Y + _ballRadius >= 800)
