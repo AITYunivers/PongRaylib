@@ -8,6 +8,7 @@ namespace PongRaylib
         private static int _paddleWidth = 20;
         private static int _paddleHeight = 200;
         private static int _ballRadius = 10;
+        private static Random _rand = new Random();
 
         public static float Paddle1Y = 400;
         public static int Paddle1Score = 0;
@@ -22,6 +23,8 @@ namespace PongRaylib
 
         public static User Serving = User.Player;
         public static User Target = User.Enemy;
+        public static float EnemyAITimer = -1;
+        public static int EnemyAIStartDir = 0;
 
         static void Main(string[] args)
         {
@@ -64,17 +67,22 @@ namespace PongRaylib
         public static void MoveEnemyPaddle(float frameTime)
         {
             frameTime *= 500;
-            float targetY = (BallPosition.Y - 400) + (BallVelocity.Y) * 5f;
-            targetY *= (BallPosition.X / 1280.0f);
-            targetY += 400;
-            if (Target != User.Enemy)
-                targetY = 400;
+            float targetY = Target != User.Enemy ? 400 : CalcBallPath();
 
-            Paddle2Dir = 0;
-            if (Paddle2Y > targetY)
-                Paddle2Dir = -1;
-            if (Paddle2Y < targetY)
-                Paddle2Dir = 1;
+            if (EnemyAITimer == -1)
+            {
+                Paddle2Dir = 0;
+                if (Paddle2Y > targetY)
+                    Paddle2Dir = -1;
+                if (Paddle2Y < targetY)
+                    Paddle2Dir = 1;
+            }
+            else if (EnemyAITimer >= 0.25f)
+            {
+                if (EnemyAIStartDir == 0)
+                    EnemyAIStartDir = _rand.Next(2) == 0 ? 1 : -1;
+                Paddle2Dir = EnemyAIStartDir;
+            }
 
             Paddle2Y += frameTime * Paddle2Dir;
             Paddle2Y = Math.Clamp(Paddle2Y, 10 + _paddleHeight / 2, 790 - _paddleHeight / 2);
@@ -83,18 +91,24 @@ namespace PongRaylib
         public static void TickBall(float frameTime)
         {
             // Check Serve
-            if (Raylib.IsKeyPressed(KeyboardKey.Enter))
+            switch (Serving)
             {
-                switch (Serving)
-                {
-                    case User.Player:
-                        BallVelocity = new Vector2(0.2f);
-                        break;
-                    case User.Enemy:
-                        BallVelocity = new Vector2(-0.2f, 0.2f);
-                        break;
-                }
-                Serving = User.None;
+                case User.Player:
+                    if (Raylib.IsKeyPressed(KeyboardKey.Enter))
+                    {
+                        BallVelocity = new Vector2(0.2f, Paddle1Dir == -1 ? -0.2f : 0.2f);
+                        Serving = User.None;
+                    }
+                    break;
+                case User.Enemy:
+                    if (_rand.Next(1000 - (int)(EnemyAITimer * 1000.0f)) == 0)
+                    {
+                        BallVelocity = new Vector2(-0.2f, Paddle2Dir == -1 ? -0.2f : 0.2f);
+                        Serving = User.None;
+                        EnemyAITimer = -1;
+                        EnemyAIStartDir = 0;
+                    }
+                    break;
             }
 
             if (Serving != User.None)
@@ -113,17 +127,16 @@ namespace PongRaylib
                         Target = User.Enemy;
                         BallVelocity.X *= -1;
                         BallVelocity.Y = 0.2f;
-                        float dist = (float)Math.Abs(BallPosition.Y - Paddle1Y) / 10000.0f;
-                        if (ballMovingDown && BallPosition.Y > Paddle1Y && Paddle1Dir == 1)
+                        float dist = (float)Math.Sqrt(BallPosition.Y * BallPosition.Y + Paddle1Y * Paddle1Y) / 10000.0f;
+                        if (ballMovingDown && Paddle1Dir == 1)
                             BallVelocity.Y += dist * 2;
-                        else if (ballMovingDown)
+                        else if (!ballMovingDown && Paddle1Dir == -1)
+                            BallVelocity.Y += dist * 2;
+                        else
                             BallVelocity.Y += dist;
-                        else if (!ballMovingDown && BallPosition.Y < Paddle1Y && Paddle1Dir == -1)
-                            BallVelocity.Y -= dist * 2;
-                        else if (!ballMovingDown)
-                            BallVelocity.Y -= dist;
-                        if (!ballMovingDown)
-                            BallVelocity.Y *= -1;
+
+
+                        BallVelocity.Y *= Paddle1Dir;
                     }
                     break;
                 case User.Enemy:
@@ -132,17 +145,16 @@ namespace PongRaylib
                         Target = User.Player;
                         BallVelocity.X *= -1;
                         BallVelocity.Y = 0.2f;
-                        float dist = (float)Math.Abs(BallPosition.Y - Paddle2Y) / 10000.0f;
-                        if (ballMovingDown && BallPosition.Y > Paddle2Y && Paddle2Dir == 1)
+                        float dist = (float)Math.Sqrt(BallPosition.Y * BallPosition.Y + Paddle2Y * Paddle2Y) / 10000.0f;
+                        if (ballMovingDown && Paddle2Dir == 1)
                             BallVelocity.Y += dist * 2;
-                        else if (ballMovingDown)
+                        else if (!ballMovingDown && Paddle2Dir == -1)
+                            BallVelocity.Y += dist * 2;
+                        else
                             BallVelocity.Y += dist;
-                        else if (!ballMovingDown && BallPosition.Y < Paddle2Y && Paddle2Dir == -1)
-                            BallVelocity.Y -= dist * 2;
-                        else if (!ballMovingDown)
-                            BallVelocity.Y -= dist;
-                        if (!ballMovingDown)
-                            BallVelocity.Y *= -1;
+
+
+                        BallVelocity.Y *= Paddle2Dir;
                     }
                     break;
             }
@@ -163,7 +175,11 @@ namespace PongRaylib
                 Target = User.Player;
                 Paddle1Score++;
                 ResetBall();
+                EnemyAITimer = 0;
             }
+
+            if (EnemyAITimer >= 0)
+                EnemyAITimer += frameTime;
 
             // Move Ball
             BallPosition += BallVelocity;
@@ -187,14 +203,14 @@ namespace PongRaylib
                             20, 80, Color.White);
 
             Raylib.DrawText(Paddle2Score.ToString(),
-                            1280 / 2 + Raylib.MeasureText(Paddle2Score.ToString(), 80) + 20,
+                            1280 / 2 + 20,
                             20, 80, Color.White);
         }
 
         public static void DrawSeperator()
         {
-            for (int i = 0; i < 800; i += 16)
-                Raylib.DrawRectangle(1280 / 2 - 5, i, 11, 11, Color.White);
+            for (int i = 0; i < 800; i += 18)
+                Raylib.DrawRectangle(1280 / 2 - 4, i, 9, 9, Color.Gray);
         }
 
         public static void ResetBall()
@@ -202,6 +218,22 @@ namespace PongRaylib
             BallPosition = new Vector2(Serving == User.Player ? 30 + _paddleWidth : 1250 - _paddleWidth,
                                        Serving == User.Player ? Paddle1Y : Paddle2Y);
             BallVelocity = new Vector2(0);
+        }
+
+        public static int CalcBallPath()
+        {
+            Vector2 calcPos = BallPosition;
+            if (BallVelocity.X == 0 || BallVelocity.Y == 0)
+                return (int)calcPos.Y;
+            while (true)
+            {
+                if (calcPos.Y - _ballRadius <= 0 || calcPos.Y + _ballRadius >= 800)
+                    calcPos.Y *= -1;
+                calcPos += BallVelocity;
+                if (calcPos.X > 1250)
+                    break;
+            }
+            return (int)calcPos.Y;
         }
 
         public enum User
