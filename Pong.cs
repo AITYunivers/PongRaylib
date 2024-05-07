@@ -132,7 +132,7 @@ namespace PongRaylib
                         Target = User.Player;
                         BallVelocity.X *= -1;
                         BallVelocity.Y = 0.2f;
-                        float dist = (float)Math.Sqrt(BallPosition.Y * BallPosition.Y + Paddle2Y * Paddle2Y) / 10000.0f;
+                        float dist = (float)Math.Abs(BallPosition.Y - Paddle2Y) / 10000.0f;
                         if (ballMovingDown && BallPosition.Y > Paddle2Y && Paddle2Dir == 1)
                             BallVelocity.Y += dist * 2;
                         else if (ballMovingDown)
