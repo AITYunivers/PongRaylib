@@ -3,7 +3,7 @@ using System.Numerics;
 
 namespace PongRaylib
 {
-    internal class Program
+    internal class Pong
     {
         private static int _paddleWidth = 20;
         private static int _paddleHeight = 200;
